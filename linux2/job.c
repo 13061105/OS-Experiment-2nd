@@ -33,13 +33,13 @@ int time_delay = 1;
 void Que_enq(struct waitqueue *newjob,int priorder/*优先级1、2、3*/)
 {
 	struct waitqueue **head = NULL;
-	
+
 	if (priorder == 0)
 	{
 		head = &(head_1st);
 		newjob->job->defpri = 1;
 		newjob->job->curpri = 1;
-	} 
+	}
 	else if (priorder == 1)
 		head = &(head_1st);
 	else if (priorder == 2)
@@ -57,7 +57,7 @@ void Que_enq(struct waitqueue *newjob,int priorder/*优先级1、2、3*/)
 	else
 	{
 		struct waitqueue *p = (*head);
-		
+
 		while (p->next != NULL)
 			p = p->next;
 		p->next = newjob;
@@ -220,7 +220,7 @@ void Current_print() {
 	printf("current wait_time :　%d\n", current->job->wait_time);
 
 	printf("current create_time :　%ld\n", current->job->create_time);
-	
+
 
 	printf("current run_time :　%d\n", current->job->run_time);
 
@@ -230,7 +230,7 @@ void Current_print() {
 		case DONE : printf("current state : DONE\n"); break;
 	}
 	*/
-	
+
 	printf("JOBID\tPID\tOWNER\tRUNTIME\tWAITTIME\tCREATTIME\t\tSTATE\n");
 	if(current){
 		strcpy(timebuf,ctime(&(current->job->create_time)));
@@ -257,7 +257,7 @@ void scheduler()
 	if((count=read(fifo,&cmd,DATALEN))<0)
 		error_sys("read fifo failed");
 #ifdef DEBUG
-
+    printf("Reading whether other process send command!\n");
 	if(count){
 		printf("cmd cmdtype\t%d\ncmd defpri\t%d\ncmd data\t%s\n",cmd.type,cmd.defpri,cmd.data);
 	}
@@ -266,26 +266,43 @@ void scheduler()
 #endif
 
 	/* 更新等待队列中的作业 */
+	#ifdef DEBUG
+            printf("Update jobs in wait queue!\n");
+    #endif
 	updateall();
 
 	switch(cmd.type){
 	case ENQ:
+        #ifdef DEBUG
+                printf("Execute enq!\n");
+        #endif
 		do_enq(newjob,cmd);
 		break;
 	case DEQ:
+        #ifdef DEBUG
+                printf("Execute deq!\n");
+        #endif
 		do_deq(cmd);
 		break;
 	case STAT:
+        #ifdef DEBUG
+                printf("Execute stat!\n");
+        #endif
 		do_stat(cmd);
 		break;
 	default:
 		break;
 	}
-
+    #ifdef DEBUG
+            printf("Select which job to run next!\n");
+    #endif
 	/* 选择高优先级作业 */
 	next=jobselect();
-	
+
 	/* 作业切换 */
+	#ifdef DEBUG
+            printf("Switch to the next job!\n");
+    #endif
 	jobswitch();
 
 
@@ -303,7 +320,7 @@ void updateall()
 {
 	struct waitqueue *p;
 	int time_period_ms = 1000;
-	
+
 	if (current != NULL)
 	{
 		if (current->job->curpri == 1)
@@ -349,14 +366,14 @@ void updateall()
 			p->job->curpri -= 1;
 			Que_moveto((&head_3rd), p, p->job->curpri);
 			printf ("Yui : move pid-%d from que-%d to que-%d.\n",p->job->pid,p->job->curpri+1,p->job->curpri);
-			p->job->wait_time = 0;	
+			p->job->wait_time = 0;
 		}
 	}
 }
 struct waitqueue* jobselect()
 {
 	struct waitqueue **head = NULL;
-	
+
 	if (head_1st != NULL)
 	{
 		head = &head_1st;
@@ -365,7 +382,7 @@ struct waitqueue* jobselect()
 	{
 		if (head_2nd != NULL)
 			head = &head_2nd;
-			
+
 		else
 		{
 			if (head_3rd != NULL)
@@ -424,7 +441,7 @@ void jobswitch()
 
 		current = NULL;
 	}
-	
+
 	if (next == NULL && current == NULL) /* 没有作业要运行 */
 		//return;
 		;
@@ -474,10 +491,13 @@ void sig_handler(int sig,siginfo_t *info,void *notused)
 {
 	int status;
 	int ret;
-			
+
 	switch (sig) {
 case SIGVTALRM: /* 到达计时器所设置的计时间隔 */
-	time_delay--;	
+	#ifdef DEBUG
+            printf("SIGVTALRM RECEIVED!\n");
+    #endif
+	time_delay--;
 	if (time_delay == 0)
 	{
 		scheduler();
@@ -488,7 +508,7 @@ case SIGVTALRM: /* 到达计时器所设置的计时间隔 */
 		else
 			time_delay = 1;
 	}
-	
+
 	return;
 case SIGCHLD: /* 子进程结束时传送给父进程的信号 */
 	ret = waitpid(-1,&status,WNOHANG);
@@ -525,7 +545,7 @@ void do_deq(struct jobcmd deqcmd)
 #ifdef DEBUG
 	printf("Task-7 : Before deq.\n");//任务7
 	Que_print_all();
-	
+
 	printf("deq jid %d\n", deqid);
 #endif
 
@@ -543,7 +563,7 @@ void do_deq(struct jobcmd deqcmd)
 		current = NULL;
 	}
 	else /* 或者在等待队列中查找deqid */
-		Que_search_delete(deqid);	
+		Que_search_delete(deqid);
 
 #ifdef DEBUG
 	printf("Task-7 : After deq.\n");//任务7
@@ -666,7 +686,7 @@ void do_stat(struct jobcmd statcmd)
 			current->job->wait_time,
 			timebuf,"RUNNING");
 	}
-	
+
 	printf ("First Queue:\n");
 	Que_print(head_1st);
 	printf ("Second Queue:\n");
@@ -683,6 +703,9 @@ int main()
 	struct timeval interval;
 	struct itimerval new,old;
 
+    #ifdef DEBUG
+            printf("DEBUG IS OPEN!");
+    #endif
 	if(stat("/tmp/server",&statbuf)==0){
 		/* 如果FIFO文件存在,删掉 */
 		if(remove("/tmp/server")<0)
@@ -708,7 +731,7 @@ int main()
 
 	new.it_interval=interval;
 	new.it_value=interval;
-	
+
 	setitimer(ITIMER_VIRTUAL,&new,&old);
 
 	while(siginfo==1);
